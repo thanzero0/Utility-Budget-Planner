@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="cursor-glow" id="cursor-glow"></div>
+    
+    <div class="app-container">
+        <header>
+            <div class="brand">budget.<em>planner</em></div>
+            <div class="total-summary">
+                <span class="label">Sisa Anggaran</span>
+                <h1 id="remaining-balance">Rp 0</h1>
+            </div>
+        </header>
+
+        <main class="planner-grid">
+            <!-- Input Section -->
+            <section class="card income-section">
+                <div class="card-header">Pendapatan</div>
+                <div class="input-group">
+                    <input type="number" id="income-input" placeholder="0" autocomplete="off">
+                    <span class="currency-tag">Rp</span>
+                </div>
+                <button id="set-income-btn" class="primary-btn">Update Saldo</button>
+            </section>
+
+            <!-- Expense Form -->
+            <section class="card expense-form">
+                <div class="card-header">Tambah Pengeluaran</div>
+                <div class="form-body">
+                    <input type="text" id="expense-name" placeholder="Nama pengeluaran..." autocomplete="off">
+                    <div class="input-row">
+                        <div class="input-group">
+                            <input type="number" id="expense-amount" placeholder="Jumlah" autocomplete="off">
+                            <span class="currency-tag">Rp</span>
+                        </div>
+                        <button id="add-expense-btn" class="add-btn">+</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Expense List -->
+            <section class="card history-section">
+                <div class="card-header">
+                    <span>Riwayat</span>
+                    <button id="reset-history" class="text-btn">Reset</button>
+                </div>
+                <div class="list-container" id="expense-list">
+                    <div class="empty-state">Belum ada data.</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/script.js"></script>
+</body>
+</html>
