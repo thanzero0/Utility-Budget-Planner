@@ -3,41 +3,28 @@ let state = {
     transactions: []
 };
 
+let categories = JSON.parse(localStorage.getItem('budget_categories')) || {
+    income: ['Gaji', 'Bonus', 'Investasi', 'Lainnya'],
+    expense: ['Makanan', 'Transportasi', 'Hiburan', 'Tagihan', 'Belanja', 'Lainnya']
+};
+
+function saveCategories() {
+    localStorage.setItem('budget_categories', JSON.stringify(categories));
+    renderCategorySelects();
+}
+
+function renderCategorySelects() {
+    const incSel = document.getElementById('income-type');
+    const expSel = document.getElementById('expense-type');
+    if (incSel) incSel.innerHTML = categories.income.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (expSel) expSel.innerHTML = categories.expense.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
 // Load from LocalStorage
 const loadState = () => {
     const saved = localStorage.getItem('budget_planner_state_v2');
     if (saved) {
         state = JSON.parse(saved);
-    } else {
-        // Migration from old state if exists
-        const oldSaved = localStorage.getItem('budget_planner_state');
-        if (oldSaved) {
-            const oldState = JSON.parse(oldSaved);
-            if (oldState.expenses) {
-                oldState.expenses.forEach(ex => {
-                    state.transactions.push({
-                        id: ex.id,
-                        type: 'expense',
-                        name: ex.name,
-                        desc: '',
-                        itemType: 'Lainnya',
-                        amount: ex.amount,
-                        date: ex.date
-                    });
-                });
-            }
-            if (oldState.income > 0) {
-                state.transactions.push({
-                    id: Date.now() + 1,
-                    type: 'income',
-                    name: 'Saldo Awal',
-                    desc: 'Migrasi dari versi sebelumnya',
-                    itemType: 'Lainnya',
-                    amount: oldState.income,
-                    date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-                });
-            }
-        }
     }
     updateUI();
 };
@@ -61,12 +48,28 @@ const addExpenseBtn = document.getElementById('add-expense-btn');
 
 const transactionList = document.getElementById('transaction-list');
 const remainingBalance = document.getElementById('remaining-balance');
-
-const resetHistoryBtn = document.getElementById('reset-history');
-const resetBudgetBtn = document.getElementById('reset-budget');
-const exportExcelBtn = document.getElementById('export-excel');
-
 const glow = document.getElementById('cursor-glow');
+
+// Modals
+const customModal = document.getElementById('app-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalBody = document.getElementById('modal-body');
+const modalFooter = document.getElementById('modal-footer');
+
+function showModal(title, content, buttonsHTML) {
+    modalTitle.innerText = title;
+    modalBody.innerHTML = content;
+    modalFooter.innerHTML = buttonsHTML;
+    customModal.classList.add('active');
+}
+
+window.closeModal = () => {
+    customModal.classList.remove('active');
+};
+
+function showAlert(message) {
+    showModal('Peringatan', `<p>${message}</p>`, `<button class="btn btn-primary" onclick="closeModal()">Tutup</button>`);
+}
 
 // Cursor Glow
 document.addEventListener('mousemove', (e) => {
@@ -172,7 +175,7 @@ function addTransaction(type) {
         saveState();
         updateUI();
     } else {
-        alert('Mohon isi nama dan jumlah dengan benar (angka lebih dari 0).');
+        showAlert('Mohon isi nama dan jumlah dengan benar (angka lebih dari 0).');
     }
 }
 
@@ -185,25 +188,37 @@ window.deleteTransaction = (index) => {
     updateUI();
 };
 
-resetHistoryBtn.addEventListener('click', () => {
-    if (confirm('Hapus semua riwayat transaksi? Saldo akan direset ke Rp 0.')) {
-        state.transactions = [];
-        saveState();
-        updateUI();
-    }
-});
+window.confirmResetHistory = () => {
+    showModal('Reset Riwayat', '<p>Anda yakin ingin menghapus semua riwayat transaksi? Saldo akan direset ke Rp 0.</p>', `
+        <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+        <button class="btn btn-danger" onclick="doResetHistory()">Reset</button>
+    `);
+};
 
-resetBudgetBtn.addEventListener('click', () => {
-    if (confirm('Anda yakin ingin mereset seluruh budget?')) {
-        state.transactions = [];
-        saveState();
-        updateUI();
-    }
-});
+window.confirmResetBudget = () => {
+    showModal('Reset Budget', '<p>Anda yakin ingin mereset seluruh budget? Semua data transaksi akan hilang.</p>', `
+        <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+        <button class="btn btn-danger" onclick="doResetBudget()">Reset</button>
+    `);
+};
 
-exportExcelBtn.addEventListener('click', () => {
+window.doResetHistory = () => {
+    state.transactions = [];
+    saveState();
+    updateUI();
+    closeModal();
+};
+
+window.doResetBudget = () => {
+    state.transactions = [];
+    saveState();
+    updateUI();
+    closeModal();
+};
+
+window.exportToExcel = () => {
     if(state.transactions.length === 0) {
-        alert('Tidak ada data untuk diekspor.');
+        showAlert('Tidak ada data untuk diekspor.');
         return;
     }
     
@@ -225,7 +240,57 @@ exportExcelBtn.addEventListener('click', () => {
     
     // Generate excel file and download
     XLSX.writeFile(wb, "Budget_Planner_Export.xlsx");
-});
+};
+
+// Category Management UI
+function getManageCategoriesContent() {
+    return `
+        <div class="category-manager">
+            <div class="cat-section">
+                <h4>Kategori Pendapatan</h4>
+                <div class="cat-list">
+                    ${categories.income.map((c, i) => `<div class="cat-badge">${c} <button onclick="deleteCat('income', ${i})">&times;</button></div>`).join('')}
+                </div>
+                <div class="add-cat-form">
+                    <input type="text" id="new-inc-cat" placeholder="Tambah kategori..." onkeypress="if(event.key === 'Enter') addCat('income')">
+                    <button onclick="addCat('income')">+</button>
+                </div>
+            </div>
+            <div class="cat-section">
+                <h4>Kategori Pengeluaran</h4>
+                <div class="cat-list">
+                    ${categories.expense.map((c, i) => `<div class="cat-badge">${c} <button onclick="deleteCat('expense', ${i})">&times;</button></div>`).join('')}
+                </div>
+                <div class="add-cat-form">
+                    <input type="text" id="new-exp-cat" placeholder="Tambah kategori..." onkeypress="if(event.key === 'Enter') addCat('expense')">
+                    <button onclick="addCat('expense')">+</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.openManageCategories = () => {
+    showModal('Kelola Kategori', getManageCategoriesContent(), `<button class="btn btn-primary" onclick="closeModal()">Tutup</button>`);
+};
+
+window.deleteCat = (type, index) => {
+    categories[type].splice(index, 1);
+    saveCategories();
+    document.getElementById('modal-body').innerHTML = getManageCategoriesContent();
+};
+
+window.addCat = (type) => {
+    const input = document.getElementById(type === 'income' ? 'new-inc-cat' : 'new-exp-cat');
+    const val = input.value.trim();
+    if(val && !categories[type].includes(val)) {
+        categories[type].push(val);
+        saveCategories();
+        document.getElementById('modal-body').innerHTML = getManageCategoriesContent();
+    } else if (categories[type].includes(val)) {
+        alert('Kategori sudah ada.');
+    }
+};
 
 // ==========================================
 // THEME AND SIZE LOGIC
@@ -234,19 +299,19 @@ const fabGroup = document.getElementById("fabGroup");
 const themeMenu = document.getElementById("themeMenu");
 const sizeMenu = document.getElementById("sizeMenu");
 
-function toggleMainFab() {
+window.toggleMainFab = () => {
     const btn = document.querySelector(".main-fab");
     fabGroup.classList.toggle("active");
     btn.classList.toggle("status-active", fabGroup.classList.contains("active"));
-}
+};
 
-function toggleSizeMenu() {
+window.toggleSizeMenu = () => {
     const customPanel = document.getElementById("customSizePanel");
     sizeMenu.classList.toggle("active");
     if (customPanel) customPanel.classList.remove("active");
-}
+};
 
-function setSize(size, isInitial = false) {
+window.setSize = (size, isInitial = false) => {
     const root = document.documentElement;
     const presets = {
         'mini': { width: '800px', scale: '0.8' },
@@ -272,21 +337,21 @@ function setSize(size, isInitial = false) {
 
     if (!isInitial) sizeMenu.classList.remove("active");
     localStorage.setItem('budget-size', size);
-}
+};
 
-function toggleCustomSize() {
+window.toggleCustomSize = () => {
     const panel = document.getElementById("customSizePanel");
     panel.classList.toggle("active");
-}
+};
 
-function applyCustomSize() {
+window.applyCustomSize = () => {
     const width = document.getElementById('size-width').value;
     const scale = document.getElementById('size-scale').value;
     const root = document.documentElement;
     root.style.setProperty('--app-width', width + 'px');
     root.style.setProperty('--app-scale', scale);
     localStorage.setItem('budget-custom-size', JSON.stringify({ width, scale }));
-}
+};
 
 function loadCustomSize() {
     const saved = localStorage.getItem('budget-custom-size');
@@ -300,13 +365,13 @@ function loadCustomSize() {
     }
 }
 
-function toggleThemeMenu() {
+window.toggleThemeMenu = () => {
     const customPanel = document.getElementById("customThemePanel");
     themeMenu.classList.toggle("active");
     if (customPanel) customPanel.classList.remove("active");
-}
+};
 
-function setTheme(theme, isInitial = false) {
+window.setTheme = (theme, isInitial = false) => {
     const customPanel = document.getElementById("customThemePanel");
 
     if (theme === 'custom') {
@@ -337,14 +402,14 @@ function setTheme(theme, isInitial = false) {
     });
 
     localStorage.setItem('budget-theme', theme);
-}
+};
 
-function toggleCustomEditor() {
+window.toggleCustomEditor = () => {
     const panel = document.getElementById("customThemePanel");
     panel.classList.toggle("active");
-}
+};
 
-function applyCustomTheme() {
+window.applyCustomTheme = () => {
     const colors = {
         '--bg-color': document.getElementById('color-bg').value,
         '--surface-color': document.getElementById('color-surface').value,
@@ -360,9 +425,9 @@ function applyCustomTheme() {
     
     // Also derive border color a bit lighter than surface
     root.style.setProperty('--border-color', adjustColor(colors['--surface-color'], 20));
-}
+};
 
-function saveCustomTheme() {
+window.saveCustomTheme = () => {
     const colors = {
         '--bg-color': document.getElementById('color-bg').value,
         '--surface-color': document.getElementById('color-surface').value,
@@ -380,7 +445,7 @@ function saveCustomTheme() {
         btn.innerText = originalText;
         btn.style.background = "";
     }, 2000);
-}
+};
 
 function loadCustomTheme() {
     const saved = localStorage.getItem('budget-custom-colors');
@@ -435,6 +500,9 @@ document.addEventListener("click", (e) => {
         document.getElementById("fabGroup").classList.remove("active");
         document.querySelector(".main-fab").classList.remove("status-active");
     }
+    if (e.target.classList.contains('modal-overlay')) {
+        closeModal();
+    }
 });
 
 // Init
@@ -443,4 +511,5 @@ const savedSize = localStorage.getItem('budget-size') || 'medium';
 setTheme(savedTheme, true);
 setSize(savedSize, true);
 
+renderCategorySelects();
 loadState();

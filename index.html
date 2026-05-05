@@ -15,9 +15,10 @@
     
     <div class="floating-controls">
         <div class="fab-group" id="fabGroup">
+            <button class="fab-btn main-fab" onclick="toggleMainFab()" aria-label="Menu">☰</button>
             <div class="fab-options">
                 <div class="size-fab-container">
-                    <button class="fab-btn size-fab" onclick="toggleSizeMenu()" aria-label="Adjust Size">⤢</button>
+                    <button class="fab-btn size-fab tooltip" onclick="toggleSizeMenu()" aria-label="Adjust Size"><span class="tooltip-text">Ukuran</span>⤢</button>
                     <div class="size-menu" id="sizeMenu">
                         <button class="size-opt" onclick="setSize('mini')">Mini</button>
                         <button class="size-opt active" onclick="setSize('medium')">Medium</button>
@@ -45,7 +46,7 @@
                 </div>
 
                 <div class="theme-fab-container">
-                    <button class="fab-btn theme-fab" onclick="toggleThemeMenu()" aria-label="Switch Theme">◐</button>
+                    <button class="fab-btn theme-fab tooltip" onclick="toggleThemeMenu()" aria-label="Switch Theme"><span class="tooltip-text">Tema</span>◐</button>
                     <div class="theme-menu" id="themeMenu">
                         <button class="theme-opt active" onclick="setTheme('dark')">Dark</button>
                         <button class="theme-opt" onclick="setTheme('light')">Light</button>
@@ -71,8 +72,20 @@
                         </div>
                     </div>
                 </div>
+                
+                <div class="action-fab-container">
+                    <button class="fab-btn tooltip" onclick="openManageCategories()" aria-label="Edit Kategori"><span class="tooltip-text">Kategori</span>✎</button>
+                </div>
+                <div class="action-fab-container">
+                    <button class="fab-btn tooltip" onclick="exportToExcel()" aria-label="Export Excel"><span class="tooltip-text">Export</span>⤓</button>
+                </div>
+                <div class="action-fab-container">
+                    <button class="fab-btn tooltip" onclick="confirmResetHistory()" aria-label="Reset Riwayat"><span class="tooltip-text">Reset Riwayat</span>⟲</button>
+                </div>
+                <div class="action-fab-container">
+                    <button class="fab-btn tooltip" onclick="confirmResetBudget()" aria-label="Reset Budget"><span class="tooltip-text">Reset Budget</span>🗑</button>
+                </div>
             </div>
-            <button class="fab-btn main-fab" onclick="toggleMainFab()" aria-label="Menu">☰</button>
         </div>
     </div>
 
@@ -92,12 +105,7 @@
                 <div class="form-body">
                     <input type="text" id="income-name" placeholder="Nama pendapatan..." autocomplete="off">
                     <input type="text" id="income-desc" placeholder="Deskripsi pendapatan..." autocomplete="off">
-                    <select id="income-type" class="item-select">
-                        <option value="Gaji">Gaji</option>
-                        <option value="Bonus">Bonus</option>
-                        <option value="Investasi">Investasi</option>
-                        <option value="Lainnya">Lainnya</option>
-                    </select>
+                    <select id="income-type" class="item-select"></select>
                     <div class="input-row">
                         <div class="input-group">
                             <input type="number" id="income-amount" placeholder="Jumlah" autocomplete="off">
@@ -114,14 +122,7 @@
                 <div class="form-body">
                     <input type="text" id="expense-name" placeholder="Nama pengeluaran..." autocomplete="off">
                     <input type="text" id="expense-desc" placeholder="Deskripsi pengeluaran..." autocomplete="off">
-                    <select id="expense-type" class="item-select">
-                        <option value="Makanan">Makanan</option>
-                        <option value="Transportasi">Transportasi</option>
-                        <option value="Hiburan">Hiburan</option>
-                        <option value="Tagihan">Tagihan</option>
-                        <option value="Belanja">Belanja</option>
-                        <option value="Lainnya">Lainnya</option>
-                    </select>
+                    <select id="expense-type" class="item-select"></select>
                     <div class="input-row">
                         <div class="input-group">
                             <input type="number" id="expense-amount" placeholder="Jumlah" autocomplete="off">
@@ -136,17 +137,28 @@
             <section class="card history-section">
                 <div class="card-header">
                     <span>Riwayat Transaksi</span>
-                    <div class="history-actions">
-                        <button id="export-excel" class="text-btn">Export Excel</button>
-                        <button id="reset-history" class="text-btn">Reset Riwayat</button>
-                        <button id="reset-budget" class="text-btn">Reset Budget</button>
-                    </div>
                 </div>
                 <div class="list-container" id="transaction-list">
                     <div class="empty-state">Belum ada data transaksi.</div>
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Custom Modal Popup -->
+    <div class="modal-overlay" id="app-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="modal-title">Title</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content -->
+            </div>
+            <div class="modal-footer" id="modal-footer">
+                <!-- Buttons -->
+            </div>
+        </div>
     </div>
 
     <script src="js/script.js"></script>
