@@ -182,6 +182,19 @@ function addTransaction(type) {
 addIncomeBtn.addEventListener('click', () => addTransaction('income'));
 addExpenseBtn.addEventListener('click', () => addTransaction('expense'));
 
+// Keyboard submission
+[incomeName, incomeDesc, incomeAmount].forEach(input => {
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addTransaction('income');
+    });
+});
+
+[expenseName, expenseDesc, expenseAmount].forEach(input => {
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addTransaction('expense');
+    });
+});
+
 window.deleteTransaction = (index) => {
     state.transactions.splice(index, 1);
     saveState();
