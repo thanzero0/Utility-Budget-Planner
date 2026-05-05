@@ -1,39 +1,81 @@
 // State Management
 let state = {
-    income: 0,
-    expenses: []
+    transactions: []
 };
 
 // Load from LocalStorage
 const loadState = () => {
-    const saved = localStorage.getItem('budget_planner_state');
+    const saved = localStorage.getItem('budget_planner_state_v2');
     if (saved) {
         state = JSON.parse(saved);
-        updateUI();
+    } else {
+        // Migration from old state if exists
+        const oldSaved = localStorage.getItem('budget_planner_state');
+        if (oldSaved) {
+            const oldState = JSON.parse(oldSaved);
+            if (oldState.expenses) {
+                oldState.expenses.forEach(ex => {
+                    state.transactions.push({
+                        id: ex.id,
+                        type: 'expense',
+                        name: ex.name,
+                        desc: '',
+                        itemType: 'Lainnya',
+                        amount: ex.amount,
+                        date: ex.date
+                    });
+                });
+            }
+            if (oldState.income > 0) {
+                state.transactions.push({
+                    id: Date.now() + 1,
+                    type: 'income',
+                    name: 'Saldo Awal',
+                    desc: 'Migrasi dari versi sebelumnya',
+                    itemType: 'Lainnya',
+                    amount: oldState.income,
+                    date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+                });
+            }
+        }
     }
+    updateUI();
 };
 
 const saveState = () => {
-    localStorage.setItem('budget_planner_state', JSON.stringify(state));
+    localStorage.setItem('budget_planner_state_v2', JSON.stringify(state));
 };
 
 // DOM Elements
-const incomeInput = document.getElementById('income-input');
-const setIncomeBtn = document.getElementById('set-income-btn');
+const incomeName = document.getElementById('income-name');
+const incomeDesc = document.getElementById('income-desc');
+const incomeType = document.getElementById('income-type');
+const incomeAmount = document.getElementById('income-amount');
+const addIncomeBtn = document.getElementById('add-income-btn');
+
 const expenseName = document.getElementById('expense-name');
+const expenseDesc = document.getElementById('expense-desc');
+const expenseType = document.getElementById('expense-type');
 const expenseAmount = document.getElementById('expense-amount');
 const addExpenseBtn = document.getElementById('add-expense-btn');
-const expenseList = document.getElementById('expense-list');
+
+const transactionList = document.getElementById('transaction-list');
 const remainingBalance = document.getElementById('remaining-balance');
+
 const resetHistoryBtn = document.getElementById('reset-history');
+const resetBudgetBtn = document.getElementById('reset-budget');
+const exportExcelBtn = document.getElementById('export-excel');
+
 const glow = document.getElementById('cursor-glow');
 
 // Cursor Glow
 document.addEventListener('mousemove', (e) => {
     glow.style.left = e.clientX + 'px';
     glow.style.top = e.clientY + 'px';
-    glow.style.opacity = '1';
+    if(glow.style.opacity === '0' || !glow.style.opacity) glow.style.opacity = '1';
 });
+document.addEventListener('mouseleave', () => glow.style.opacity = '0');
+document.addEventListener('mouseenter', () => glow.style.opacity = '1');
 
 // Logic
 function formatIDR(amount) {
@@ -45,80 +87,360 @@ function formatIDR(amount) {
 }
 
 function updateUI() {
-    // Update Balance
-    const totalExpenses = state.expenses.reduce((acc, curr) => acc + curr.amount, 0);
-    const balance = state.income - totalExpenses;
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    state.transactions.forEach(t => {
+        if (t.type === 'income') totalIncome += t.amount;
+        else if (t.type === 'expense') totalExpense += t.amount;
+    });
+
+    const balance = totalIncome - totalExpense;
     remainingBalance.textContent = formatIDR(balance);
     
-    // Update List
-    if (state.expenses.length === 0) {
-        expenseList.innerHTML = '<div class="empty-state">Belum ada data pengeluaran.</div>';
+    if(balance < 0) {
+        remainingBalance.className = 'negative';
+    } else if (balance > 0) {
+        remainingBalance.className = 'positive';
     } else {
-        expenseList.innerHTML = '';
-        state.expenses.slice().reverse().forEach((expense, index) => {
-            const originalIndex = state.expenses.length - 1 - index;
+        remainingBalance.className = '';
+    }
+    
+    // Update List
+    if (state.transactions.length === 0) {
+        transactionList.innerHTML = '<div class="empty-state">Belum ada data transaksi.</div>';
+    } else {
+        transactionList.innerHTML = '';
+        state.transactions.slice().reverse().forEach((t, index) => {
+            const originalIndex = state.transactions.length - 1 - index;
             const item = document.createElement('div');
             item.className = 'expense-item';
+            
+            const isIncome = t.type === 'income';
+            const amountClass = isIncome ? 'income' : 'expense';
+            const sign = isIncome ? '+' : '-';
+            
             item.innerHTML = `
                 <div class="ei-info">
-                    <span class="ei-name">${expense.name}</span>
-                    <span class="ei-date">${expense.date}</span>
+                    <span class="ei-name">${t.name}</span>
+                    ${t.desc ? `<span class="ei-desc">${t.desc}</span>` : ''}
+                    <div class="ei-meta">
+                        <span class="ei-type-badge">${t.itemType}</span>
+                        <span class="ei-date">${t.date}</span>
+                    </div>
                 </div>
                 <div class="ei-right">
-                    <span class="ei-amount">${formatIDR(expense.amount)}</span>
-                    <button class="delete-btn" onclick="deleteExpense(${originalIndex})">
+                    <span class="ei-amount ${amountClass}">${sign} ${formatIDR(t.amount)}</span>
+                    <button class="delete-btn" onclick="deleteTransaction(${originalIndex})" aria-label="Hapus">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                 </div>
             `;
-            expenseList.appendChild(item);
+            transactionList.appendChild(item);
         });
     }
-
-    incomeInput.value = state.income || '';
 }
 
-setIncomeBtn.addEventListener('click', () => {
-    const val = parseFloat(incomeInput.value);
-    if (!isNaN(val)) {
-        state.income = val;
-        saveState();
-        updateUI();
-    }
-});
+function addTransaction(type) {
+    const isIncome = type === 'income';
+    const nameInput = isIncome ? incomeName : expenseName;
+    const descInput = isIncome ? incomeDesc : expenseDesc;
+    const typeInput = isIncome ? incomeType : expenseType;
+    const amountInput = isIncome ? incomeAmount : expenseAmount;
 
-addExpenseBtn.addEventListener('click', () => {
-    const name = expenseName.value.trim();
-    const amount = parseFloat(expenseAmount.value);
+    const name = nameInput.value.trim();
+    const desc = descInput.value.trim();
+    const itemType = typeInput.value;
+    const amount = parseFloat(amountInput.value);
 
-    if (name && !isNaN(amount)) {
-        const expense = {
+    if (name && !isNaN(amount) && amount > 0) {
+        const transaction = {
             id: Date.now(),
+            type,
             name,
+            desc,
+            itemType,
             amount,
-            date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+            date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' })
         };
-        state.expenses.push(expense);
-        expenseName.value = '';
-        expenseAmount.value = '';
+        state.transactions.push(transaction);
+        
+        nameInput.value = '';
+        descInput.value = '';
+        amountInput.value = '';
+        
         saveState();
         updateUI();
+    } else {
+        alert('Mohon isi nama dan jumlah dengan benar (angka lebih dari 0).');
     }
-});
+}
 
-window.deleteExpense = (index) => {
-    state.expenses.splice(index, 1);
+addIncomeBtn.addEventListener('click', () => addTransaction('income'));
+addExpenseBtn.addEventListener('click', () => addTransaction('expense'));
+
+window.deleteTransaction = (index) => {
+    state.transactions.splice(index, 1);
     saveState();
     updateUI();
 };
 
 resetHistoryBtn.addEventListener('click', () => {
-    if (confirm('Hapus semua riwayat pengeluaran?')) {
-        state.expenses = [];
+    if (confirm('Hapus semua riwayat transaksi? Saldo akan direset ke Rp 0.')) {
+        state.transactions = [];
         saveState();
         updateUI();
     }
 });
 
+resetBudgetBtn.addEventListener('click', () => {
+    if (confirm('Anda yakin ingin mereset seluruh budget?')) {
+        state.transactions = [];
+        saveState();
+        updateUI();
+    }
+});
+
+exportExcelBtn.addEventListener('click', () => {
+    if(state.transactions.length === 0) {
+        alert('Tidak ada data untuk diekspor.');
+        return;
+    }
+    
+    const data = state.transactions.map(t => ({
+        'Tanggal': t.date,
+        'Tipe': t.type === 'income' ? 'Pendapatan' : 'Pengeluaran',
+        'Kategori': t.itemType,
+        'Nama': t.name,
+        'Deskripsi': t.desc,
+        'Jumlah (Rp)': t.amount
+    }));
+    
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transaksi");
+    
+    // Generate excel file and download
+    XLSX.writeFile(wb, "Budget_Planner_Export.xlsx");
+});
+
+// ==========================================
+// THEME AND SIZE LOGIC
+// ==========================================
+const fabGroup = document.getElementById("fabGroup");
+const themeMenu = document.getElementById("themeMenu");
+const sizeMenu = document.getElementById("sizeMenu");
+
+function toggleMainFab() {
+    const btn = document.querySelector(".main-fab");
+    fabGroup.classList.toggle("active");
+    btn.classList.toggle("status-active", fabGroup.classList.contains("active"));
+}
+
+function toggleSizeMenu() {
+    const customPanel = document.getElementById("customSizePanel");
+    sizeMenu.classList.toggle("active");
+    if (customPanel) customPanel.classList.remove("active");
+}
+
+function setSize(size, isInitial = false) {
+    const root = document.documentElement;
+    const presets = {
+        'mini': { width: '800px', scale: '0.8' },
+        'medium': { width: '1000px', scale: '1' },
+        'large': { width: '1200px', scale: '1.1' },
+        'desktop': { width: '100%', scale: '1' }
+    };
+
+    if (size === 'custom') {
+        loadCustomSize();
+    } else if (presets[size]) {
+        root.style.setProperty('--app-width', presets[size].width);
+        root.style.setProperty('--app-scale', presets[size].scale);
+        if (document.getElementById('customSizePanel')) 
+            document.getElementById('customSizePanel').classList.remove('active');
+    }
+
+    document.querySelectorAll('.size-opt').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.innerText.toLowerCase() === size) btn.classList.add('active');
+        if (size === 'custom' && btn.id === 'customSizeOpt') btn.classList.add('active');
+    });
+
+    if (!isInitial) sizeMenu.classList.remove("active");
+    localStorage.setItem('budget-size', size);
+}
+
+function toggleCustomSize() {
+    const panel = document.getElementById("customSizePanel");
+    panel.classList.toggle("active");
+}
+
+function applyCustomSize() {
+    const width = document.getElementById('size-width').value;
+    const scale = document.getElementById('size-scale').value;
+    const root = document.documentElement;
+    root.style.setProperty('--app-width', width + 'px');
+    root.style.setProperty('--app-scale', scale);
+    localStorage.setItem('budget-custom-size', JSON.stringify({ width, scale }));
+}
+
+function loadCustomSize() {
+    const saved = localStorage.getItem('budget-custom-size');
+    if (saved) {
+        const { width, scale } = JSON.parse(saved);
+        const root = document.documentElement;
+        root.style.setProperty('--app-width', width + 'px');
+        root.style.setProperty('--app-scale', scale);
+        document.getElementById('size-width').value = width;
+        document.getElementById('size-scale').value = scale;
+    }
+}
+
+function toggleThemeMenu() {
+    const customPanel = document.getElementById("customThemePanel");
+    themeMenu.classList.toggle("active");
+    if (customPanel) customPanel.classList.remove("active");
+}
+
+function setTheme(theme, isInitial = false) {
+    const customPanel = document.getElementById("customThemePanel");
+
+    if (theme === 'custom') {
+        document.body.className = '';
+        document.body.classList.add('custom-theme');
+        loadCustomTheme();
+        if (customPanel && !isInitial) customPanel.classList.toggle('active');
+    } else {
+        document.body.className = '';
+        document.body.style = ''; 
+        if (theme !== 'dark') {
+            document.body.classList.add(theme + '-theme');
+        }
+        if (customPanel) customPanel.classList.remove('active');
+        if (!isInitial) {
+            themeMenu.classList.remove("active");
+        }
+    }
+
+    document.querySelectorAll('.theme-opt').forEach(btn => {
+        btn.classList.remove('active');
+        const text = btn.innerText.toLowerCase();
+        if (text === theme || (theme === 'cyberpunk' && text === 'cyber')) {
+            btn.classList.add('active');
+        } else if (theme === 'custom' && btn.id === 'customThemeOpt') {
+            btn.classList.add('active');
+        }
+    });
+
+    localStorage.setItem('budget-theme', theme);
+}
+
+function toggleCustomEditor() {
+    const panel = document.getElementById("customThemePanel");
+    panel.classList.toggle("active");
+}
+
+function applyCustomTheme() {
+    const colors = {
+        '--bg-color': document.getElementById('color-bg').value,
+        '--surface-color': document.getElementById('color-surface').value,
+        '--accent-color': document.getElementById('color-primary').value,
+        '--text-primary': document.getElementById('color-text').value,
+        '--cursor-color': document.getElementById('color-primary').value
+    };
+
+    const root = document.body;
+    for (const [prop, val] of Object.entries(colors)) {
+        root.style.setProperty(prop, val);
+    }
+    
+    // Also derive border color a bit lighter than surface
+    root.style.setProperty('--border-color', adjustColor(colors['--surface-color'], 20));
+}
+
+function saveCustomTheme() {
+    const colors = {
+        '--bg-color': document.getElementById('color-bg').value,
+        '--surface-color': document.getElementById('color-surface').value,
+        '--accent-color': document.getElementById('color-primary').value,
+        '--text-primary': document.getElementById('color-text').value
+    };
+
+    localStorage.setItem('budget-custom-colors', JSON.stringify(colors));
+
+    const btn = document.querySelector('.save-theme-btn');
+    const originalText = btn.innerText;
+    btn.innerText = "Saved! ✓";
+    btn.style.background = "#10b981";
+    setTimeout(() => {
+        btn.innerText = originalText;
+        btn.style.background = "";
+    }, 2000);
+}
+
+function loadCustomTheme() {
+    const saved = localStorage.getItem('budget-custom-colors');
+    if (saved) {
+        const colors = JSON.parse(saved);
+        const root = document.body;
+        for (const [prop, val] of Object.entries(colors)) {
+            root.style.setProperty(prop, val);
+            
+            const map = {
+                '--bg-color': 'color-bg',
+                '--surface-color': 'color-surface',
+                '--accent-color': 'color-primary',
+                '--text-primary': 'color-text'
+            };
+            
+            if(map[prop]) {
+                const input = document.getElementById(map[prop]);
+                if (input) input.value = val;
+            }
+        }
+        root.style.setProperty('--cursor-color', colors['--accent-color']);
+        root.style.setProperty('--border-color', adjustColor(colors['--surface-color'], 20));
+    }
+}
+
+function adjustColor(hex, amt) {
+    let usePound = false;
+    if (hex[0] == "#") { hex = hex.slice(1); usePound = true; }
+    let num = parseInt(hex, 16);
+    let r = (num >> 16) + amt;
+    if (r > 255) r = 255; else if (r < 0) r = 0;
+    let b = ((num >> 8) & 0x00FF) + amt;
+    if (b > 255) b = 255; else if (b < 0) b = 0;
+    let g = (num & 0x0000FF) + amt;
+    if (g > 255) g = 255; else if (g < 0) g = 0;
+    return (usePound ? "#" : "") + (g | (b << 8) | (r << 16)).toString(16).padStart(6, '0');
+}
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".theme-fab-container")) {
+        themeMenu.classList.remove("active");
+        const customPanel = document.getElementById("customThemePanel");
+        if (customPanel) customPanel.classList.remove("active");
+    }
+    if (!e.target.closest(".size-fab-container")) {
+        if (sizeMenu) sizeMenu.classList.remove("active");
+        const customSizePanel = document.getElementById("customSizePanel");
+        if (customSizePanel) customSizePanel.classList.remove("active");
+    }
+    if (!e.target.closest("#fabGroup")) {
+        document.getElementById("fabGroup").classList.remove("active");
+        document.querySelector(".main-fab").classList.remove("status-active");
+    }
+});
+
 // Init
+const savedTheme = localStorage.getItem('budget-theme') || 'dark';
+const savedSize = localStorage.getItem('budget-size') || 'medium';
+setTheme(savedTheme, true);
+setSize(savedSize, true);
+
 loadState();
